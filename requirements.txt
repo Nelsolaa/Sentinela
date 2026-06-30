@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic
+influxdb-client
+psutil
+python-dotenv
+requests

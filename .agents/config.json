@@ -1,0 +1,5 @@
+{
+  "host_id": "local-host",
+  "environment": "development",
+  "api_url": "http://127.0.0.1:8000"
+}
