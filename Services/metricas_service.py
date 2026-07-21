@@ -1,8 +1,9 @@
-from Collectors.Host import cpu
+from Collectors import cpu_collector
+
 
 def metricas_cpu():
     return {
-        "uso_percentual": cpu.cpu_usage(),
-        "nucleos_logicos": cpu.cpu_nucleos(),
-        "frequencia": cpu.cpu_frequency(),
+        "uso_percentual": cpu_collector.cpu_usage(),
+        "nucleos_logicos": cpu_collector.cpu_nucleos(),
+        "frequencia": cpu_collector.cpu_frequency(),
     }

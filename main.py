@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from Controllers.metrics_controller import router as metrics_router
+from Controllers.server_metrics_controller import router as server_metrics_router
 
 app = FastAPI(
     title="Sentinela API",
@@ -18,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(metrics_router)
+app.include_router(server_metrics_router)
 
 
 @app.get("/health")
