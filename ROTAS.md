@@ -6,19 +6,44 @@ Base URL local:
 http://127.0.0.1:8000
 ```
 
-Documentacao interativa da FastAPI:
+A documentacao interativa fica em `http://127.0.0.1:8000/docs` quando
+`SENTINELA_DOCS_ENABLED=true`.
 
-```text
-http://127.0.0.1:8000/docs
+Todas as rotas estao reunidas em `Controllers/monitoring_controller.py`. O controller trata o
+protocolo HTTP e chama os services; ele nao coleta, transforma ou persiste dados diretamente.
+
+## Chaves de servico
+
+A API usa duas chaves independentes:
+
+| Header | Uso |
+| --- | --- |
+| `X-Sentinela-Ingest-Key` | autoriza `POST /metrics` |
+| `X-Sentinela-Read-Key` | autoriza as rotas de CPU, memoria, disco, temperatura, GPU e servidor |
+
+As chaves ficam em `SENTINELA_INGEST_API_KEY` e `SENTINELA_READ_API_KEY`. Cada valor deve ter
+pelo menos 32 caracteres e pode ser gerado com:
+
+```bash
+openssl rand -hex 32
 ```
 
-## Health
+Use valores diferentes para leitura e escrita. As chaves devem ser enviadas somente em headers
+e nunca em query strings ou URLs.
 
-| Metodo | Rota | Funcao | Arquivo | Objetivo |
-| --- | --- | --- | --- | --- |
-| GET | `/health` | `health_check` | `main.py` | Verifica se a API esta online. |
+## Healthcheck
 
-Exemplo de resposta:
+| Metodo | Rota | Autorizacao | Limite padrao |
+| --- | --- | --- | --- |
+| `GET` | `/health` | publica | 120 requisicoes por minuto e por IP |
+
+Exemplo:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Resposta:
 
 ```json
 {
@@ -28,56 +53,30 @@ Exemplo de resposta:
 
 ## Metricas locais do servidor
 
-Essas rotas coletam dados diretamente da maquina onde a API esta rodando. Elas nao dependem do InfluxDB.
+Essas rotas consultam a maquina em que a API esta executando. Elas nao leem o historico do
+InfluxDB.
 
-| Metodo | Rota | Funcao da rota | Funcao de service | Objetivo |
-| --- | --- | --- | --- | --- |
-| GET | `/cpu` | `read_cpu_metrics` | `get_cpu_metrics` | Retorna uso de CPU, quantidade de nucleos logicos e frequencia. |
-| GET | `/memoria` | `read_memory_metrics` | `get_memory_metrics` | Retorna total, disponivel, usado, livre e percentual de uso da memoria RAM. |
-| GET | `/disco` | `read_disk_metrics` | `get_disk_metrics` | Retorna total, usado, livre e percentual de uso do disco raiz (`/`). |
-| GET | `/temperatura` | `read_temperature_metrics` | `get_temperature_metrics` | Retorna sensores de temperatura quando o sistema operacional disponibiliza esses dados. |
-| GET | `/gpu` | `read_gpu_metrics` | `get_gpu_metrics` | Retorna metricas simuladas de GPU: temperatura, uso e VRAM. |
-| GET | `/servidor` | `read_server_metrics` | `get_server_metrics` | Retorna todas as metricas locais em uma unica resposta. |
+| Metodo | Rota | Service | Resultado |
+| --- | --- | --- | --- |
+| `GET` | `/cpu` | `cpu_service` | uso, nucleos logicos e frequencia |
+| `GET` | `/memoria` | `memoria_service` | total, disponivel, usado, livre e percentual |
+| `GET` | `/disco` | `disco_service` | total, usado, livre e percentual do disco raiz |
+| `GET` | `/temperatura` | `temperatura_service` | sensores disponiveis ou erro generico controlado |
+| `GET` | `/gpu` | `gpu_service` | temperatura, uso e VRAM simulados |
+| `GET` | `/servidor` | `server_metrics_service` | snapshot completo com tags da maquina |
 
-Arquivos principais:
+Todas essas rotas exigem `X-Sentinela-Read-Key` e compartilham o limite padrao de 60
+requisicoes por minuto e por IP.
 
-```text
-Controllers/server_metrics_controller.py
-Services/server_metrics_service.py
-Collectors/cpu_collector.py
-Collectors/memoria_collector.py
-Collectors/disco_collector.py
-Collectors/temperatura_collector.py
-Collectors/gpu_collector.py
+Exemplo:
+
+```bash
+curl \
+  -H "X-Sentinela-Read-Key: $SENTINELA_READ_API_KEY" \
+  http://127.0.0.1:8000/servidor
 ```
 
-Exemplo de teste no Insomnia:
-
-```text
-GET http://127.0.0.1:8000/cpu
-```
-
-Exemplo de resposta de `/cpu`:
-
-```json
-{
-  "usage_percent": 18.5,
-  "logical_cores": 8,
-  "frequency_mhz": {
-    "current": 2400.0,
-    "min": 1200.0,
-    "max": 3200.0
-  }
-}
-```
-
-Exemplo de teste para buscar tudo:
-
-```text
-GET http://127.0.0.1:8000/servidor
-```
-
-A resposta agregada inclui tags que identificam a origem das metricas:
+Resposta resumida:
 
 ```json
 {
@@ -90,77 +89,59 @@ A resposta agregada inclui tags que identificam a origem das metricas:
   "memoria": {},
   "disco": {},
   "temperatura": {},
-  "gpu": {}
-}
-```
-
-Configure `SENTINELA_MACHINE_TYPE` como `host` ou `vm` no `.env`. A flag identifica a
-maquina onde o processo esta executando; ela nao permite que um processo no host colete dados
-internos de uma VM.
-
-## Recebimento de metricas
-
-Essa rota recebe uma metrica enviada por outro cliente, agente ou servico. Depois ela normaliza os dados e tenta enviar para o InfluxDB.
-
-| Metodo | Rota | Funcao da rota | Funcoes chamadas | Objetivo |
-| --- | --- | --- | --- | --- |
-| POST | `/metrics` | `receive_metric` | `prepare_metric`, `send_with_buffer` | Recebe uma metrica, normaliza os campos e tenta persistir no InfluxDB. Se o InfluxDB nao estiver disponivel, guarda em buffer local em memoria. |
-
-Arquivos principais:
-
-```text
-Controllers/metrics_controller.py
-Services/metrics_service.py
-Services/buffer_service.py
-infra/influxdb_repository.py
-```
-
-Body esperado:
-
-```json
-{
-  "measurement": "system_metrics",
-  "tags": {
-    "host": "local"
-  },
-  "fields": {
-    "cpu_percent": 42,
-    "memory_bytes": 1073741824
-  },
-  "timestamp": "2026-07-06T10:00:00Z"
-}
-```
-
-Campos:
-
-| Campo | Tipo | Obrigatorio | Descricao |
-| --- | --- | --- | --- |
-| `measurement` | `string` | Nao | Nome da metrica. Padrao: `system_metrics`. |
-| `tags` | `object` | Nao | Tags para identificar origem, host, ambiente ou outro agrupamento. |
-| `fields` | `object` | Sim | Valores da metrica. Precisa ter pelo menos um campo. |
-| `timestamp` | `datetime` | Nao | Data/hora da metrica. Se nao enviado, a API usa o horario atual em UTC. |
-
-Exemplo de teste no Insomnia:
-
-```text
-POST http://127.0.0.1:8000/metrics
-Content-Type: application/json
-```
-
-```json
-{
-  "measurement": "system_metrics",
-  "tags": {
-    "host": "local"
-  },
-  "fields": {
-    "cpu_percent": 42,
-    "memory_bytes": 1073741824
+  "gpu": {
+    "source": "mock"
   }
 }
 ```
 
-Exemplo de resposta quando o InfluxDB nao esta disponivel:
+Configure `SENTINELA_MACHINE_TYPE` como `host` ou `vm`. A flag identifica o ambiente em que o
+processo executa; ela nao permite que um processo no host leia o interior de uma VM.
+
+## Recebimento de metricas
+
+| Metodo | Rota | Autorizacao | Limite padrao |
+| --- | --- | --- | --- |
+| `POST` | `/metrics` | `X-Sentinela-Ingest-Key` | 30 requisicoes por minuto e por IP |
+
+A rota aceita somente `Content-Type: application/json` e corpos de ate 32 KiB. O measurement
+padrao e o unico inicialmente permitido e `system_metrics`.
+
+Exemplo:
+
+```bash
+curl \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Sentinela-Ingest-Key: $SENTINELA_INGEST_API_KEY" \
+  -d '{
+    "measurement": "system_metrics",
+    "tags": {
+      "host_id": "local-host",
+      "environment": "development"
+    },
+    "fields": {
+      "cpu_percent": 42.0,
+      "memory_bytes": 1073741824
+    }
+  }' \
+  http://127.0.0.1:8000/metrics
+```
+
+### Contrato do payload
+
+| Campo | Regra |
+| --- | --- |
+| `measurement` | nome permitido, entre 1 e 100 caracteres |
+| `tags` | no maximo 20 pares; somente chaves permitidas e valores de ate 256 caracteres |
+| `fields` | entre 1 e 50 pares; valores `boolean`, `integer`, `float` finito ou texto curto |
+| `timestamp` | data e hora com timezone; se ausente, a API usa UTC atual |
+
+As tags permitidas inicialmente sao `host_id`, `machine_type`, `environment` e `os`. A lista
+pode ser ampliada por `SENTINELA_ALLOWED_TAG_KEYS`. Campos desconhecidos, objetos aninhados,
+inteiros fora de 64 bits e valores infinitos ou `NaN` sao rejeitados.
+
+Resposta quando a metrica foi colocada no buffer:
 
 ```json
 {
@@ -168,30 +149,48 @@ Exemplo de resposta quando o InfluxDB nao esta disponivel:
   "metric": {
     "measurement": "system_metrics",
     "tags": {
-      "host": "local"
+      "host_id": "local-host",
+      "environment": "development"
     },
     "fields": {
       "cpu_percent": 42.0,
       "memory_bytes_gb": 1.0
     },
-    "timestamp": "2026-07-06T13:00:00+00:00"
+    "timestamp": "2026-07-24T13:00:00+00:00"
   },
   "persisted": false,
-  "buffered": 1,
-  "error": "InfluxDB is not reachable."
+  "buffered": 1
 }
 ```
 
-## Como rodar localmente
+A resposta nao inclui mensagens internas do InfluxDB. Quando o buffer atinge sua capacidade,
+a API rejeita novas metricas com HTTP 503 em vez de consumir memoria indefinidamente.
+
+## Respostas de seguranca
+
+| Status | Motivo |
+| --- | --- |
+| `401` | chave ausente ou invalida |
+| `413` | corpo maior que o limite permitido |
+| `415` | escrita sem `application/json` |
+| `422` | payload fora do schema |
+| `429` | limite de requisicoes excedido |
+| `503` | chaves nao configuradas, buffer cheio ou monitoramento indisponivel |
+
+Respostas limitadas incluem `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` e
+`X-RateLimit-Reset`.
+
+## Execucao local
+
+Instale as dependencias, configure o `.env` e execute um unico worker enquanto o rate limit
+usar `memory://`:
 
 ```bash
 cd /Users/nelsonneto/Programacao/Sentinela/Sentinela
 source venv/bin/activate
+pip install -r requirements-dev.txt
 python -m uvicorn main:app --reload
 ```
 
-Depois teste as rotas no Insomnia, navegador ou na documentacao:
-
-```text
-http://127.0.0.1:8000/docs
-```
+Para producao, desative a documentacao, habilite HTTPS no proxy, configure hosts explicitos e
+use um contador compartilhado ou rate limit no reverse proxy caso existam multiplos workers.

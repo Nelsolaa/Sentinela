@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 pydantic
 influxdb-client
+limits>=5.3,<6
 psutil
 python-dotenv
 requests

@@ -42,7 +42,16 @@ class ServerMetricsRoutesTests(unittest.TestCase):
         paths = set(main.app.openapi()["paths"])
 
         self.assertTrue(
-            {"/cpu", "/memoria", "/disco", "/temperatura", "/gpu", "/servidor"}
+            {
+                "/health",
+                "/metrics",
+                "/cpu",
+                "/memoria",
+                "/disco",
+                "/temperatura",
+                "/gpu",
+                "/servidor",
+            }
             <= paths
         )
 

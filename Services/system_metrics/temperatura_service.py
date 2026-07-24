@@ -1,17 +1,21 @@
+import logging
 from typing import Any
 
 from Collectors import temperatura_collector
 from Services.system_metrics._converters import as_dict
 
+logger = logging.getLogger(__name__)
+
 
 def get_temperature_metrics() -> dict[str, Any]:
     try:
         sensors = temperatura_collector.temperature()
-    except Exception as exc:
+    except Exception:
+        logger.exception("Temperature sensors are unavailable.")
         return {
             "available": False,
             "sensors": {},
-            "error": str(exc),
+            "error": "temperature_sensors_unavailable",
         }
 
     return {

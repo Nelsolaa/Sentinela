@@ -95,15 +95,21 @@ class TemperatureServiceTests(unittest.TestCase):
         self.assertEqual(metrics["sensors"]["coretemp"][0]["current"], 48.0)
 
     def test_handles_unavailable_sensors(self) -> None:
-        with patch(
-            "Services.system_metrics.temperatura_service.temperatura_collector.temperature",
-            side_effect=RuntimeError("sensors unavailable"),
+        with (
+            self.assertLogs(
+                "Services.system_metrics.temperatura_service",
+                level="ERROR",
+            ),
+            patch(
+                "Services.system_metrics.temperatura_service.temperatura_collector.temperature",
+                side_effect=RuntimeError("sensors unavailable"),
+            ),
         ):
             metrics = get_temperature_metrics()
 
         self.assertFalse(metrics["available"])
         self.assertEqual(metrics["sensors"], {})
-        self.assertEqual(metrics["error"], "sensors unavailable")
+        self.assertEqual(metrics["error"], "temperature_sensors_unavailable")
 
 
 class GpuServiceTests(unittest.TestCase):
