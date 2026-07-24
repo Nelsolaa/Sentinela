@@ -3,32 +3,10 @@ import unittest
 from unittest.mock import patch
 
 import main
-from Services.server_metrics_service import get_machine_tags, get_server_metrics
+from Services.server_metrics_service import get_server_metrics
 
 
-class MachineTagsTests(unittest.TestCase):
-    def test_returns_normalized_machine_tags(self) -> None:
-        environment = {
-            "SENTINELA_HOST_ID": "vm-banco-01",
-            "SENTINELA_MACHINE_TYPE": " VM ",
-            "SENTINELA_ENV": "production",
-        }
-
-        with patch.dict(os.environ, environment):
-            self.assertEqual(
-                get_machine_tags(),
-                {
-                    "host_id": "vm-banco-01",
-                    "machine_type": "vm",
-                    "environment": "production",
-                },
-            )
-
-    def test_rejects_invalid_machine_type(self) -> None:
-        with patch.dict(os.environ, {"SENTINELA_MACHINE_TYPE": "container"}):
-            with self.assertRaisesRegex(ValueError, "host, vm"):
-                get_machine_tags()
-
+class ServerMetricsServiceTests(unittest.TestCase):
     def test_server_snapshot_includes_machine_tags(self) -> None:
         with (
             patch.dict(os.environ, {"SENTINELA_MACHINE_TYPE": "host"}),

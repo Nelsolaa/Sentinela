@@ -2,14 +2,12 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from Services.server_metrics_service import (
-    get_cpu_metrics,
-    get_disk_metrics,
-    get_gpu_metrics,
-    get_memory_metrics,
-    get_server_metrics,
-    get_temperature_metrics,
-)
+from Services.server_metrics_service import get_server_metrics
+from Services.system_metrics.cpu_service import get_cpu_metrics
+from Services.system_metrics.disco_service import get_disk_metrics
+from Services.system_metrics.gpu_service import get_gpu_metrics
+from Services.system_metrics.memoria_service import get_memory_metrics
+from Services.system_metrics.temperatura_service import get_temperature_metrics
 
 router = APIRouter(tags=["server metrics"])
 
