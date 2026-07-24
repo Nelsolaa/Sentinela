@@ -12,6 +12,10 @@ INFLUXDB_URL = os.getenv("INFLUXDB_URL", "http://localhost:8086")
 INFLUXDB_ORG = os.getenv("INFLUXDB_ORG", "sentinela")
 INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET", "metrics")
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN", "")
+INFLUXDB_TIMEOUT_MS = int(os.getenv("INFLUXDB_TIMEOUT_MS", "5000"))
+
+if INFLUXDB_TIMEOUT_MS <= 0:
+    raise ValueError("INFLUXDB_TIMEOUT_MS must be greater than zero.")
 
 _client: InfluxDBClient | None = None
 _write_api: Any | None = None
@@ -25,6 +29,7 @@ def _get_client() -> InfluxDBClient:
             url=INFLUXDB_URL,
             token=INFLUXDB_TOKEN,
             org=INFLUXDB_ORG,
+            timeout=INFLUXDB_TIMEOUT_MS,
         )
 
     return _client
