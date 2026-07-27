@@ -59,8 +59,8 @@ InfluxDB.
 | Metodo | Rota | Service | Resultado |
 | --- | --- | --- | --- |
 | `GET` | `/cpu` | `cpu_service` | uso, nucleos logicos e frequencia |
-| `GET` | `/memoria` | `memoria_service` | total, disponivel, usado, livre e percentual |
-| `GET` | `/disco` | `disco_service` | total, usado, livre e percentual do disco raiz |
+| `GET` | `/memoria` | `memoria_service` | total, disponivel, usado e livre em GiB, mais percentual |
+| `GET` | `/disco` | `disco_service` | total, usado e livre em GiB, mais percentual do disco raiz |
 | `GET` | `/temperatura` | `temperatura_service` | sensores disponiveis ou erro generico controlado |
 | `GET` | `/gpu` | `gpu_service` | temperatura, uso e VRAM simulados |
 | `GET` | `/servidor` | `server_metrics_service` | snapshot completo com tags da maquina |
@@ -118,11 +118,22 @@ curl \
     "measurement": "system_metrics",
     "tags": {
       "host_id": "local-host",
-      "environment": "development"
+      "machine_type": "host",
+      "environment": "development",
+      "os": "darwin"
     },
     "fields": {
-      "cpu_percent": 42.0,
-      "memory_bytes": 1073741824
+      "cpu_usage_percent": 42.0,
+      "cpu_logical_cores": 8,
+      "memory_total_gib": 16.0,
+      "memory_available_gib": 6.0,
+      "memory_used_gib": 10.0,
+      "memory_free_gib": 2.0,
+      "memory_usage_percent": 62.5,
+      "disk_total_gib": 512.0,
+      "disk_used_gib": 192.0,
+      "disk_free_gib": 320.0,
+      "disk_usage_percent": 37.5
     }
   }' \
   http://127.0.0.1:8000/metrics
@@ -133,13 +144,13 @@ curl \
 | Campo | Regra |
 | --- | --- |
 | `measurement` | nome permitido, entre 1 e 100 caracteres |
-| `tags` | no maximo 20 pares; somente chaves permitidas e valores de ate 256 caracteres |
-| `fields` | entre 1 e 50 pares; valores `boolean`, `integer`, `float` finito ou texto curto |
+| `tags` | exige `host_id`, `machine_type`, `environment` e `os` |
+| `fields` | exige o nucleo de CPU, memoria e disco; aceita somente campos do contrato |
 | `timestamp` | data e hora com timezone; se ausente, a API usa UTC atual |
 
-As tags permitidas inicialmente sao `host_id`, `machine_type`, `environment` e `os`. A lista
-pode ser ampliada por `SENTINELA_ALLOWED_TAG_KEYS`. Campos desconhecidos, objetos aninhados,
-inteiros fora de 64 bits e valores infinitos ou `NaN` sao rejeitados.
+O contrato completo de campos, tipos e unidades esta em `docs/CONTRATO_METRICAS.md`. Campos
+desconhecidos, objetos aninhados, inteiros fora de 64 bits e valores infinitos ou `NaN` sao
+rejeitados. `machine_type` aceita somente `host` ou `vm`.
 
 Resposta quando a metrica foi colocada no buffer:
 
@@ -150,11 +161,22 @@ Resposta quando a metrica foi colocada no buffer:
     "measurement": "system_metrics",
     "tags": {
       "host_id": "local-host",
-      "environment": "development"
+      "machine_type": "host",
+      "environment": "development",
+      "os": "darwin"
     },
     "fields": {
-      "cpu_percent": 42.0,
-      "memory_bytes_gb": 1.0
+      "cpu_usage_percent": 42.0,
+      "cpu_logical_cores": 8,
+      "memory_total_gib": 16.0,
+      "memory_available_gib": 6.0,
+      "memory_used_gib": 10.0,
+      "memory_free_gib": 2.0,
+      "memory_usage_percent": 62.5,
+      "disk_total_gib": 512.0,
+      "disk_used_gib": 192.0,
+      "disk_free_gib": 320.0,
+      "disk_usage_percent": 37.5
     },
     "timestamp": "2026-07-24T13:00:00+00:00"
   },

@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
+from Schemas.metric_schema import SYSTEM_METRIC_FIELD_KEYS
 from Services.agent_queue_service import AgentQueue
 from Services.agent_service import (
     AgentCycleResult,
@@ -13,6 +14,7 @@ from Services.agent_service import (
     AgentSettings,
     SentinelaAgent,
     build_metric_payload,
+    canonicalize_queued_payload,
 )
 
 
@@ -45,16 +47,16 @@ def snapshot():
             "frequency_mhz": {"current": 2400.0, "min": 1200.0, "max": 3200.0},
         },
         "memoria": {
-            "total_bytes": 1000,
-            "available_bytes": 600,
-            "used_bytes": 400,
-            "free_bytes": 200,
+            "total_gib": 16.0,
+            "available_gib": 6.0,
+            "used_gib": 10.0,
+            "free_gib": 2.0,
             "usage_percent": 40.0,
         },
         "disco": {
-            "total_bytes": 2000,
-            "used_bytes": 750,
-            "free_bytes": 1250,
+            "total_gib": 512.0,
+            "used_gib": 192.0,
+            "free_gib": 320.0,
             "usage_percent": 37.5,
         },
         "temperatura": {
@@ -70,7 +72,7 @@ def snapshot():
             "source": "mock",
             "temperature_celsius": 45.0,
             "usage_percent": 20.0,
-            "vram": {"used_mb": 800, "total_mb": 4096},
+            "vram": {"used_mib": 800, "total_mib": 4096},
         },
     }
 
@@ -89,9 +91,28 @@ class AgentPayloadTests(unittest.TestCase):
         self.assertEqual(payload["measurement"], "system_metrics")
         self.assertEqual(payload["tags"]["os"], "linux")
         self.assertEqual(payload["fields"]["cpu_usage_percent"], 25.0)
+        self.assertEqual(payload["fields"]["memory_total_gib"], 16.0)
+        self.assertEqual(payload["fields"]["disk_total_gib"], 512.0)
         self.assertEqual(payload["fields"]["temperature_average_celsius"], 45.0)
         self.assertEqual(payload["fields"]["gpu_source"], "mock")
+        self.assertEqual(set(payload["fields"]), SYSTEM_METRIC_FIELD_KEYS)
         self.assertTrue(all(not isinstance(value, dict) for value in payload["fields"].values()))
+
+    def test_converts_payload_from_legacy_persistent_queue(self) -> None:
+        payload = {
+            "fields": {
+                "memory_total_bytes": 16 * (1024**3),
+                "disk_free_bytes": 320 * (1024**3),
+                "gpu_vram_used_mb": 800,
+            }
+        }
+
+        canonical = canonicalize_queued_payload(payload)
+
+        self.assertEqual(canonical["fields"]["memory_total_gib"], 16.0)
+        self.assertEqual(canonical["fields"]["disk_free_gib"], 320.0)
+        self.assertEqual(canonical["fields"]["gpu_vram_used_mib"], 800)
+        self.assertIn("memory_total_bytes", payload["fields"])
 
 
 class AgentQueueTests(unittest.TestCase):

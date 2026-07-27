@@ -9,6 +9,8 @@ from Services.system_metrics.gpu_service import get_gpu_metrics
 from Services.system_metrics.memoria_service import get_memory_metrics
 from Services.system_metrics.temperatura_service import get_temperature_metrics
 
+GIBIBYTE = 1024**3
+
 
 class CpuServiceTests(unittest.TestCase):
     def test_formats_cpu_metrics(self) -> None:
@@ -38,10 +40,10 @@ class CpuServiceTests(unittest.TestCase):
 class MemoryServiceTests(unittest.TestCase):
     def test_formats_memory_metrics(self) -> None:
         raw_memory = SimpleNamespace(
-            total=1000,
-            available=600,
-            used=400,
-            free=200,
+            total=16 * GIBIBYTE,
+            available=6 * GIBIBYTE,
+            used=10 * GIBIBYTE,
+            free=2 * GIBIBYTE,
             percent=40.0,
         )
 
@@ -54,18 +56,40 @@ class MemoryServiceTests(unittest.TestCase):
         self.assertEqual(
             metrics,
             {
-                "total_bytes": 1000,
-                "available_bytes": 600,
-                "used_bytes": 400,
-                "free_bytes": 200,
+                "total_gib": 16.0,
+                "available_gib": 6.0,
+                "used_gib": 10.0,
+                "free_gib": 2.0,
                 "usage_percent": 40.0,
             },
         )
 
+    def test_does_not_treat_one_percent_as_a_ratio(self) -> None:
+        raw_memory = SimpleNamespace(
+            total=GIBIBYTE,
+            available=GIBIBYTE,
+            used=0,
+            free=GIBIBYTE,
+            percent=1.0,
+        )
+
+        with patch(
+            "Services.system_metrics.memoria_service.memoria_collector.memory_usage",
+            return_value=raw_memory,
+        ):
+            metrics = get_memory_metrics()
+
+        self.assertEqual(metrics["usage_percent"], 1.0)
+
 
 class DiskServiceTests(unittest.TestCase):
     def test_formats_disk_metrics(self) -> None:
-        raw_disk = SimpleNamespace(total=2000, used=750, free=1250, percent=37.5)
+        raw_disk = SimpleNamespace(
+            total=512 * GIBIBYTE,
+            used=192 * GIBIBYTE,
+            free=320 * GIBIBYTE,
+            percent=37.5,
+        )
 
         with patch(
             "Services.system_metrics.disco_service.disco_collector.disk_usage",
@@ -73,9 +97,9 @@ class DiskServiceTests(unittest.TestCase):
         ):
             metrics = get_disk_metrics()
 
-        self.assertEqual(metrics["total_bytes"], 2000)
-        self.assertEqual(metrics["used_bytes"], 750)
-        self.assertEqual(metrics["free_bytes"], 1250)
+        self.assertEqual(metrics["total_gib"], 512.0)
+        self.assertEqual(metrics["used_gib"], 192.0)
+        self.assertEqual(metrics["free_gib"], 320.0)
         self.assertEqual(metrics["usage_percent"], 37.5)
 
 
@@ -111,6 +135,22 @@ class TemperatureServiceTests(unittest.TestCase):
         self.assertEqual(metrics["sensors"], {})
         self.assertEqual(metrics["error"], "temperature_sensors_unavailable")
 
+    def test_handles_platform_without_temperature_support(self) -> None:
+        with (
+            self.assertLogs(
+                "Services.system_metrics.temperatura_service",
+                level="INFO",
+            ),
+            patch(
+                "Services.system_metrics.temperatura_service.temperatura_collector.temperature",
+                side_effect=AttributeError("unsupported"),
+            ),
+        ):
+            metrics = get_temperature_metrics()
+
+        self.assertFalse(metrics["available"])
+        self.assertEqual(metrics["sensors"], {})
+
 
 class GpuServiceTests(unittest.TestCase):
     def test_marks_gpu_metrics_as_mock(self) -> None:
@@ -133,7 +173,7 @@ class GpuServiceTests(unittest.TestCase):
         self.assertEqual(metrics["source"], "mock")
         self.assertEqual(metrics["temperature_celsius"], 45.0)
         self.assertEqual(metrics["usage_percent"], 20.0)
-        self.assertEqual(metrics["vram"]["total_mb"], 4096)
+        self.assertEqual(metrics["vram"]["total_mib"], 4096)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from Services.agent_queue_service import AgentQueue, AgentQueueCapacityError
 from Services.server_metrics_service import get_server_metrics
+from Services.system_metrics._converters import bytes_to_gibibytes
 
 load_dotenv()
 
@@ -21,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 PLACEHOLDER_KEY_PARTS = ("change-me", "replace")
+LEGACY_BYTE_FIELD_NAMES = {
+    "memory_total_bytes": "memory_total_gib",
+    "memory_available_bytes": "memory_available_gib",
+    "memory_used_bytes": "memory_used_gib",
+    "memory_free_bytes": "memory_free_gib",
+    "disk_total_bytes": "disk_total_gib",
+    "disk_used_bytes": "disk_used_gib",
+    "disk_free_bytes": "disk_free_gib",
+}
+LEGACY_FIELD_NAMES = {
+    "gpu_vram_used_mb": "gpu_vram_used_mib",
+    "gpu_vram_total_mb": "gpu_vram_total_mib",
+}
 
 
 class AgentConfigurationError(ValueError):
@@ -138,8 +152,8 @@ def _temperature_fields(temperature: dict[str, Any]) -> dict[str, Any]:
                 "temperature_average_celsius": round(
                     sum(current_values) / len(current_values), 2
                 ),
-                "temperature_min_celsius": min(current_values),
-                "temperature_max_celsius": max(current_values),
+                "temperature_min_celsius": round(min(current_values), 2),
+                "temperature_max_celsius": round(max(current_values), 2),
             }
         )
     return fields
@@ -157,20 +171,20 @@ def build_metric_payload() -> dict[str, Any]:
     fields: dict[str, Any] = {
         "cpu_usage_percent": cpu["usage_percent"],
         "cpu_logical_cores": cpu["logical_cores"],
-        "memory_total_bytes": memory["total_bytes"],
-        "memory_available_bytes": memory["available_bytes"],
-        "memory_used_bytes": memory["used_bytes"],
-        "memory_free_bytes": memory["free_bytes"],
+        "memory_total_gib": memory["total_gib"],
+        "memory_available_gib": memory["available_gib"],
+        "memory_used_gib": memory["used_gib"],
+        "memory_free_gib": memory["free_gib"],
         "memory_usage_percent": memory["usage_percent"],
-        "disk_total_bytes": disk["total_bytes"],
-        "disk_used_bytes": disk["used_bytes"],
-        "disk_free_bytes": disk["free_bytes"],
+        "disk_total_gib": disk["total_gib"],
+        "disk_used_gib": disk["used_gib"],
+        "disk_free_gib": disk["free_gib"],
         "disk_usage_percent": disk["usage_percent"],
         "gpu_source": gpu["source"],
         "gpu_temperature_celsius": gpu["temperature_celsius"],
         "gpu_usage_percent": gpu["usage_percent"],
-        "gpu_vram_used_mb": vram["used_mb"],
-        "gpu_vram_total_mb": vram["total_mb"],
+        "gpu_vram_used_mib": vram["used_mib"],
+        "gpu_vram_total_mib": vram["total_mib"],
         **_temperature_fields(snapshot["temperatura"]),
     }
 
@@ -188,6 +202,21 @@ def build_metric_payload() -> dict[str, Any]:
         "fields": fields,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def canonicalize_queued_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    canonical = {**payload, "fields": dict(payload.get("fields") or {})}
+    fields = canonical["fields"]
+
+    for legacy_name, canonical_name in LEGACY_BYTE_FIELD_NAMES.items():
+        if legacy_name in fields:
+            fields[canonical_name] = bytes_to_gibibytes(fields.pop(legacy_name))
+
+    for legacy_name, canonical_name in LEGACY_FIELD_NAMES.items():
+        if legacy_name in fields:
+            fields[canonical_name] = fields.pop(legacy_name)
+
+    return canonical
 
 
 class AgentHttpClient:
@@ -310,7 +339,7 @@ class SentinelaAgent:
         delivered = 0
         for item_id, pending_payload in self._queue.pending(limit):
             try:
-                self._client.send(pending_payload)
+                self._client.send(canonicalize_queued_payload(pending_payload))
             except AgentDeliveryError as exc:
                 logger.warning("Metric delivery postponed: %s", exc)
                 break

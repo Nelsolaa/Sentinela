@@ -4,7 +4,8 @@ from numbers import Number
 from typing import Any
 
 from dotenv import load_dotenv
-from influxdb_client import InfluxDBClient, WriteOptions
+from influxdb_client import InfluxDBClient
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 load_dotenv()
 
@@ -39,14 +40,7 @@ def _get_write_api() -> Any:
     global _write_api
 
     if _write_api is None:
-        _write_api = _get_client().write_api(
-            write_options=WriteOptions(
-                batch_size=500,
-                flush_interval=10_000,
-                jitter_interval=2_000,
-                retry_interval=5_000,
-            )
-        )
+        _write_api = _get_client().write_api(write_options=SYNCHRONOUS)
 
     return _write_api
 
@@ -136,7 +130,7 @@ def close() -> None:
     global _client, _write_api
 
     if _write_api is not None:
-        _write_api.flush()
+        _write_api.close()
         _write_api = None
 
     if _client is not None:

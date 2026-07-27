@@ -48,11 +48,22 @@ class MonitoringSecurityTests(unittest.TestCase):
             "measurement": "system_metrics",
             "tags": {
                 "host_id": "host-01",
+                "machine_type": "host",
                 "environment": "development",
+                "os": "linux",
             },
             "fields": {
-                "cpu_percent": 25.5,
-                "logical_cores": 8,
+                "cpu_usage_percent": 25.5,
+                "cpu_logical_cores": 8,
+                "memory_total_gib": 16.0,
+                "memory_available_gib": 6.0,
+                "memory_used_gib": 10.0,
+                "memory_free_gib": 2.0,
+                "memory_usage_percent": 62.5,
+                "disk_total_gib": 512.0,
+                "disk_used_gib": 192.0,
+                "disk_free_gib": 320.0,
+                "disk_usage_percent": 37.5,
             },
         }
 
@@ -140,6 +151,10 @@ class MonitoringSecurityTests(unittest.TestCase):
         self.assertTrue(response.json()["accepted"])
         self.assertFalse(response.json()["persisted"])
         self.assertNotIn("error", response.json())
+        self.assertEqual(
+            response.json()["metric"]["fields"],
+            self.valid_payload()["fields"],
+        )
 
     def test_rejects_unsupported_content_type(self) -> None:
         response = self.client.post(
@@ -202,9 +217,45 @@ class MonitoringSecurityTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
 
+    def test_rejects_missing_required_tag(self) -> None:
+        payload = self.valid_payload()
+        del payload["tags"]["os"]
+
+        response = self.client.post(
+            "/metrics",
+            json=payload,
+            headers={"X-Sentinela-Ingest-Key": INGEST_KEY},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejects_field_outside_contract(self) -> None:
+        payload = self.valid_payload()
+        payload["fields"]["attacker_field"] = 10
+
+        response = self.client.post(
+            "/metrics",
+            json=payload,
+            headers={"X-Sentinela-Ingest-Key": INGEST_KEY},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejects_missing_required_metric_field(self) -> None:
+        payload = self.valid_payload()
+        del payload["fields"]["disk_usage_percent"]
+
+        response = self.client.post(
+            "/metrics",
+            json=payload,
+            headers={"X-Sentinela-Ingest-Key": INGEST_KEY},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
     def test_rejects_integer_outside_influxdb_range(self) -> None:
         payload = self.valid_payload()
-        payload["fields"] = {"counter": 2**63}
+        payload["fields"]["cpu_logical_cores"] = 2**63
 
         response = self.client.post(
             "/metrics",
@@ -216,7 +267,31 @@ class MonitoringSecurityTests(unittest.TestCase):
 
     def test_rejects_text_in_numeric_normalized_field(self) -> None:
         payload = self.valid_payload()
-        payload["fields"] = {"cpu_percent": "not-a-number"}
+        payload["fields"]["cpu_usage_percent"] = "not-a-number"
+
+        response = self.client.post(
+            "/metrics",
+            json=payload,
+            headers={"X-Sentinela-Ingest-Key": INGEST_KEY},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejects_percentage_outside_contract_range(self) -> None:
+        payload = self.valid_payload()
+        payload["fields"]["cpu_usage_percent"] = 101.0
+
+        response = self.client.post(
+            "/metrics",
+            json=payload,
+            headers={"X-Sentinela-Ingest-Key": INGEST_KEY},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejects_negative_capacity(self) -> None:
+        payload = self.valid_payload()
+        payload["fields"]["memory_total_gib"] = -1.0
 
         response = self.client.post(
             "/metrics",
