@@ -1,0 +1,63 @@
+name: sentinela
+
+services:
+  influxdb:
+    image: influxdb:2
+    container_name: sentinela_influxdb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_ADMIN_USERNAME:?Configure INFLUXDB_ADMIN_USERNAME in .env}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:?Configure INFLUXDB_ADMIN_PASSWORD in .env}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:?Configure INFLUXDB_TOKEN in .env}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:?Configure INFLUXDB_ORG in .env}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:?Configure INFLUXDB_BUCKET in .env}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    networks:
+      - sentinela_network
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sentinela_grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Configure GRAFANA_ADMIN_USER in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Configure GRAFANA_ADMIN_PASSWORD in .env}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:?Configure INFLUXDB_ORG in .env}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:?Configure INFLUXDB_BUCKET in .env}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:?Configure INFLUXDB_TOKEN in .env}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - sentinela_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+networks:
+  sentinela_network:
+    driver: bridge
+
+volumes:
+  influxdb-data:
+  influxdb-config:
+  grafana-data:
