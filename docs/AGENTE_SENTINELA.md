@@ -84,7 +84,11 @@ indisponiveis.
 ## Payload
 
 Cada ciclo envia um unico measurement `system_metrics` com campos planos para CPU, memoria,
-disco, temperatura e GPU. As tags sao `host_id`, `machine_type`, `environment` e `os`.
+disco, temperatura e GPU. Memoria e disco sao convertidos pelos services para GiB; os valores
+continuam numericos para uso pelo Grafana e pelo bot do Telegram. As tags sao `host_id`,
+`machine_type`, `environment` e `os`.
+
+O conjunto completo de nomes, tipos e unidades esta em `docs/CONTRATO_METRICAS.md`.
 
 A GPU permanece simulada nesta etapa e o payload inclui `gpu_source=mock`. Esses valores nao
 devem ser usados para alertas de producao ate a integracao real com a GPU AMD no Linux.

@@ -8,7 +8,7 @@ O MVP do Sentinela estara pronto quando, no ambiente local de desenvolvimento:
 2. as metricas forem enviadas sem chamadas manuais;
 3. os dados forem persistidos no InfluxDB;
 4. o Grafana consultar o InfluxDB por um datasource provisionado;
-5. os dashboards forem criados automaticamente ao iniciar a stack;
+5. os dashboards criados manualmente forem exportados como JSON e versionados;
 6. CPU, memoria, disco e ultima coleta puderem ser acompanhados pelo navegador;
 7. o procedimento completo puder ser repetido a partir do repositorio.
 
@@ -25,16 +25,16 @@ O servidor Linux, o bot do Telegram e recursos preditivos nao fazem parte deste 
 | fila local do agente | concluido | SQLite preserva metricas quando a API esta indisponivel |
 | autenticacao e retry | concluido | chave de ingestao, timeout e backoff implementados |
 | API de ingestao | concluido | `POST /metrics` validado, protegido e limitado |
-| escrita no InfluxDB | validada | teste real persistiu 21 campos em 24/07/2026 |
-| InfluxDB e Grafana | concluido em branch separada | stack Docker esta no PR Docker |
-| datasource do Grafana | concluido em branch separada | provisioning aponta para InfluxDB com Flux |
+| escrita no InfluxDB | validada | teste real persistiu 21 campos canonicos em 27/07/2026 |
+| InfluxDB e Grafana | concluido | stack Docker integrada na `main` |
+| datasource do Grafana | concluido | provisioning aponta para InfluxDB com Flux |
 | execucao local automatizada | pendente | API e agente ainda precisam ser iniciados separadamente |
 | dashboards provisionados | pendente | nenhum dashboard JSON esta versionado |
 | validacao reproduzivel | pendente | falta testar a solucao consolidada a partir da `main` |
 
 ## 3. Caminho critico
 
-### Entrega 1 - Consolidar as branches
+### Entrega 1 - Consolidar as branches (concluida)
 
 Objetivo: colocar infraestrutura e aplicacao na mesma base antes de criar dashboards.
 
@@ -49,13 +49,13 @@ Objetivo: colocar infraestrutura e aplicacao na mesma base antes de criar dashbo
 **Criterio de aceite:** a branch `main` contem agente, API, Compose, InfluxDB, datasource do
 Grafana e testes, sem depender de arquivos existentes apenas em outra branch.
 
-### Entrega 2 - Congelar o contrato das metricas
+### Entrega 2 - Congelar o contrato das metricas (concluida nesta entrega)
 
 Objetivo: garantir que os dashboards usem nomes de campos estaveis.
 
-- listar os campos realmente persistidos no measurement `system_metrics`;
-- corrigir nomes ambiguos como `memory_total_bytes_gb`, caso ainda sejam produzidos;
-- definir unidades finais para bytes, GiB, MHz, Celsius e percentuais;
+- listar os campos persistidos no measurement `system_metrics`;
+- usar nomes canonicos como `memory_total_gib` e `disk_free_gib`;
+- definir unidades finais para GiB, MiB, MHz, Celsius e percentuais;
 - manter CPU, memoria e disco como dados reais obrigatorios;
 - tratar temperatura como opcional no macOS;
 - manter a GPU identificada como `mock` e fora dos indicadores principais;
@@ -85,8 +85,8 @@ InfluxDB a cada ciclo, sem executar `agent.py --once` manualmente.
 
 Objetivo: transformar as series do InfluxDB na experiencia minima de monitoramento.
 
-- adicionar provisioning de dashboards ao Compose;
-- versionar os dashboards como JSON no repositorio;
+- criar os dashboards manualmente pela interface do Grafana;
+- exportar e versionar os dashboards como JSON no repositorio;
 - usar o datasource com UID `sentinela-influxdb`;
 - adicionar filtros por `host_id` e `environment`;
 - criar painel de uso atual e historico de CPU;
@@ -97,8 +97,8 @@ Objetivo: transformar as series do InfluxDB na experiencia minima de monitoramen
 - ocultar temperatura quando o sensor nao estiver disponivel;
 - identificar qualquer painel de GPU como dado simulado.
 
-**Criterio de aceite:** um Grafana novo carrega os dashboards automaticamente e apresenta os
-dados reais do MacBook sem configuracao manual pela interface.
+**Criterio de aceite:** os dashboards apresentam os dados reais do MacBook e seus JSONs
+exportados permitem demonstracao, versionamento e restauracao.
 
 ### Entrega 5 - Validacao final do MVP
 
@@ -132,15 +132,15 @@ Caso contrario, qualquer mudanca de nome ou unidade obrigara a refazer as consul
 
 ## 5. Checklist de conclusao
 
-- [ ] PR Docker integrado na `main`.
-- [ ] PR do agente e da API integrado na `main`.
-- [ ] `.env.example` unico e coerente.
+- [x] PR Docker integrado na `main`.
+- [x] PR do agente e da API integrado na `main`.
+- [x] `.env.example` unico e coerente.
 - [ ] Versoes do InfluxDB e Grafana fixadas.
 - [ ] Limites de recursos do Docker definidos.
-- [ ] Contrato de campos e unidades congelado.
+- [x] Contrato de campos e unidades congelado.
 - [ ] Pipeline iniciado por um unico comando.
 - [ ] Agente enviando continuamente a cada 60 segundos.
-- [ ] Datasource do Grafana provisionado automaticamente.
+- [x] Datasource do Grafana provisionado automaticamente.
 - [ ] Dashboard de CPU funcionando.
 - [ ] Dashboard de memoria funcionando.
 - [ ] Dashboard de disco funcionando.
@@ -169,6 +169,6 @@ Estes itens permanecem importantes, mas nao bloqueiam a definicao atual de pront
 
 ## 7. Proxima acao
 
-A proxima entrega deve consolidar as branches Docker e agente em uma base de integracao,
-resolver o `.env.example` e executar os testes. Somente depois disso deve ser iniciado o
-dashboard, usando o contrato definitivo das metricas persistidas.
+A proxima entrega deve automatizar a execucao local da API e do agente. Os dashboards podem ser
+criados manualmente em seguida, usando os nomes definidos em `docs/CONTRATO_METRICAS.md`, e
+exportados como JSON para o repositorio.

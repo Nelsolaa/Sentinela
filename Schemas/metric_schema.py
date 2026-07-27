@@ -11,8 +11,6 @@ from pydantic import (
     field_validator,
 )
 
-from Security.config import ALLOWED_MEASUREMENTS, ALLOWED_TAG_KEYS
-
 SafeName = Annotated[
     str,
     StringConstraints(
@@ -42,6 +40,90 @@ IntegerFieldValue = Annotated[
 ]
 FiniteFloat = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 MetricFieldValue = StrictBool | IntegerFieldValue | FiniteFloat | TextFieldValue
+SYSTEM_METRIC_MEASUREMENT = "system_metrics"
+
+SYSTEM_METRIC_NUMERIC_FIELDS = frozenset(
+    {
+        "cpu_usage_percent",
+        "cpu_frequency_current_mhz",
+        "cpu_frequency_min_mhz",
+        "cpu_frequency_max_mhz",
+        "memory_total_gib",
+        "memory_available_gib",
+        "memory_used_gib",
+        "memory_free_gib",
+        "memory_usage_percent",
+        "disk_total_gib",
+        "disk_used_gib",
+        "disk_free_gib",
+        "disk_usage_percent",
+        "temperature_average_celsius",
+        "temperature_min_celsius",
+        "temperature_max_celsius",
+        "gpu_temperature_celsius",
+        "gpu_usage_percent",
+    }
+)
+SYSTEM_METRIC_INTEGER_FIELDS = frozenset(
+    {
+        "cpu_logical_cores",
+        "temperature_sensor_count",
+        "gpu_vram_used_mib",
+        "gpu_vram_total_mib",
+    }
+)
+SYSTEM_METRIC_BOOLEAN_FIELDS = frozenset({"temperature_available"})
+SYSTEM_METRIC_TEXT_FIELDS = frozenset({"gpu_source"})
+SYSTEM_METRIC_PERCENT_FIELDS = frozenset(
+    {
+        "cpu_usage_percent",
+        "memory_usage_percent",
+        "disk_usage_percent",
+        "gpu_usage_percent",
+    }
+)
+SYSTEM_METRIC_NON_NEGATIVE_FIELDS = frozenset(
+    {
+        "cpu_frequency_current_mhz",
+        "cpu_frequency_min_mhz",
+        "cpu_frequency_max_mhz",
+        "memory_total_gib",
+        "memory_available_gib",
+        "memory_used_gib",
+        "memory_free_gib",
+        "disk_total_gib",
+        "disk_used_gib",
+        "disk_free_gib",
+        "cpu_logical_cores",
+        "temperature_sensor_count",
+        "gpu_vram_used_mib",
+        "gpu_vram_total_mib",
+    }
+)
+SYSTEM_METRIC_FIELD_KEYS = (
+    SYSTEM_METRIC_NUMERIC_FIELDS
+    | SYSTEM_METRIC_INTEGER_FIELDS
+    | SYSTEM_METRIC_BOOLEAN_FIELDS
+    | SYSTEM_METRIC_TEXT_FIELDS
+)
+REQUIRED_SYSTEM_METRIC_FIELD_KEYS = frozenset(
+    {
+        "cpu_usage_percent",
+        "cpu_logical_cores",
+        "memory_total_gib",
+        "memory_available_gib",
+        "memory_used_gib",
+        "memory_free_gib",
+        "memory_usage_percent",
+        "disk_total_gib",
+        "disk_used_gib",
+        "disk_free_gib",
+        "disk_usage_percent",
+    }
+)
+SYSTEM_METRIC_TAG_KEYS = frozenset(
+    {"host_id", "machine_type", "environment", "os"}
+)
 
 
 class MetricPayload(BaseModel):
@@ -55,15 +137,17 @@ class MetricPayload(BaseModel):
     @field_validator("measurement")
     @classmethod
     def validate_allowed_measurement(cls, value: str) -> str:
-        if value not in ALLOWED_MEASUREMENTS:
-            raise ValueError("Measurement is not allowed.")
+        if value != SYSTEM_METRIC_MEASUREMENT:
+            raise ValueError("Measurement must match the system metric contract.")
         return value
 
     @field_validator("tags")
     @classmethod
     def validate_allowed_tags(cls, value: dict[str, str]) -> dict[str, str]:
-        if not set(value) <= ALLOWED_TAG_KEYS:
-            raise ValueError("One or more tag keys are not allowed.")
+        if set(value) != SYSTEM_METRIC_TAG_KEYS:
+            raise ValueError("System metric tags must match the contract.")
+        if value["machine_type"] not in {"host", "vm"}:
+            raise ValueError("machine_type must be host or vm.")
         return value
 
     @field_validator("fields", mode="before")
@@ -81,20 +165,31 @@ class MetricPayload(BaseModel):
         cls,
         value: dict[str, MetricFieldValue],
     ) -> dict[str, MetricFieldValue]:
+        field_keys = set(value)
+        if not field_keys <= SYSTEM_METRIC_FIELD_KEYS:
+            raise ValueError("One or more metric fields are not part of the contract.")
+        if not REQUIRED_SYSTEM_METRIC_FIELD_KEYS <= field_keys:
+            raise ValueError("Required system metric fields are missing.")
+
         for key, field_value in value.items():
-            lowered_key = key.lower()
-            needs_number = (
-                lowered_key.endswith("_bytes")
-                or lowered_key in {"total", "used", "free"}
-                or "percent" in lowered_key
-                or "porcent" in lowered_key
-                or lowered_key.endswith("_pct")
-            )
-            if needs_number and (
+            if key in SYSTEM_METRIC_NUMERIC_FIELDS and (
                 isinstance(field_value, bool)
                 or not isinstance(field_value, (int, float))
             ):
                 raise ValueError(f"Field {key} must contain a numeric value.")
+            if key in SYSTEM_METRIC_INTEGER_FIELDS and type(field_value) is not int:
+                raise ValueError(f"Field {key} must contain an integer value.")
+            if key in SYSTEM_METRIC_BOOLEAN_FIELDS and type(field_value) is not bool:
+                raise ValueError(f"Field {key} must contain a boolean value.")
+            if key in SYSTEM_METRIC_TEXT_FIELDS and not isinstance(field_value, str):
+                raise ValueError(f"Field {key} must contain a text value.")
+            if key in SYSTEM_METRIC_PERCENT_FIELDS and not 0 <= field_value <= 100:
+                raise ValueError(f"Field {key} must be between zero and 100.")
+            if key in SYSTEM_METRIC_NON_NEGATIVE_FIELDS and field_value < 0:
+                raise ValueError(f"Field {key} must not be negative.")
+
+        if value["cpu_logical_cores"] <= 0:
+            raise ValueError("cpu_logical_cores must be greater than zero.")
 
         return value
 

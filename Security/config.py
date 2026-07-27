@@ -35,15 +35,6 @@ ALLOWED_HOSTS = _csv_setting(
     "127.0.0.1,localhost,testserver",
 )
 CORS_ORIGINS = _csv_setting("SENTINELA_CORS_ORIGINS")
-ALLOWED_MEASUREMENTS = frozenset(
-    _csv_setting("SENTINELA_ALLOWED_MEASUREMENTS", "system_metrics")
-)
-ALLOWED_TAG_KEYS = frozenset(
-    _csv_setting(
-        "SENTINELA_ALLOWED_TAG_KEYS",
-        "host_id,machine_type,environment,os",
-    )
-)
 
 DOCS_ENABLED = _bool_setting("SENTINELA_DOCS_ENABLED", default=True)
 HTTPS_ONLY = _bool_setting("SENTINELA_HTTPS_ONLY", default=False)

@@ -10,6 +10,13 @@ logger = logging.getLogger(__name__)
 def get_temperature_metrics() -> dict[str, Any]:
     try:
         sensors = temperatura_collector.temperature()
+    except (AttributeError, NotImplementedError):
+        logger.info("Temperature sensors are not supported on this platform.")
+        return {
+            "available": False,
+            "sensors": {},
+            "error": "temperature_sensors_unavailable",
+        }
     except Exception:
         logger.exception("Temperature sensors are unavailable.")
         return {
