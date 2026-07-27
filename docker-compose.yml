@@ -2,9 +2,11 @@ name: sentinela
 
 services:
   influxdb:
-    image: influxdb:2
+    image: influxdb:2.9.1
     container_name: sentinela_influxdb
     restart: unless-stopped
+    mem_limit: ${INFLUXDB_MEMORY_LIMIT:-1g}
+    cpus: ${INFLUXDB_CPU_LIMIT:-1.0}
     ports:
       - "127.0.0.1:8086:8086"
     environment:
@@ -27,9 +29,11 @@ services:
       start_period: 20s
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.1.1
     container_name: sentinela_grafana
     restart: unless-stopped
+    mem_limit: ${GRAFANA_MEMORY_LIMIT:-512m}
+    cpus: ${GRAFANA_CPU_LIMIT:-0.5}
     ports:
       - "127.0.0.1:3000:3000"
     environment:

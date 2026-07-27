@@ -28,7 +28,7 @@ O servidor Linux, o bot do Telegram e recursos preditivos nao fazem parte deste 
 | escrita no InfluxDB | validada | teste real persistiu 21 campos canonicos em 27/07/2026 |
 | InfluxDB e Grafana | concluido | stack Docker integrada na `main` |
 | datasource do Grafana | concluido | provisioning aponta para InfluxDB com Flux |
-| execucao local automatizada | pendente | API e agente ainda precisam ser iniciados separadamente |
+| execucao local automatizada | concluido | um comando gerencia Docker, API e agente no host |
 | dashboards provisionados | pendente | nenhum dashboard JSON esta versionado |
 | validacao reproduzivel | pendente | falta testar a solucao consolidada a partir da `main` |
 
@@ -64,13 +64,13 @@ Objetivo: garantir que os dashboards usem nomes de campos estaveis.
 **Criterio de aceite:** uma coleta possui campos planos, unidades documentadas e nomes que nao
 precisarao ser alterados durante a criacao dos dashboards.
 
-### Entrega 3 - Automatizar a execucao local
+### Entrega 3 - Automatizar a execucao local (concluida nesta entrega)
 
 Objetivo: iniciar a coleta completa sem abrir e configurar dois terminais manualmente.
 
 - manter o agente diretamente no macOS para que `psutil` observe o host real;
 - manter InfluxDB e Grafana no Docker;
-- decidir se a API sera executada no host ou em container separado;
+- executar a API no host junto ao agente;
 - criar comandos documentados de `start`, `status`, `logs` e `stop`;
 - iniciar a API antes do agente e aguardar o healthcheck;
 - executar o agente com intervalo padrao de 60 segundos;
@@ -135,11 +135,11 @@ Caso contrario, qualquer mudanca de nome ou unidade obrigara a refazer as consul
 - [x] PR Docker integrado na `main`.
 - [x] PR do agente e da API integrado na `main`.
 - [x] `.env.example` unico e coerente.
-- [ ] Versoes do InfluxDB e Grafana fixadas.
-- [ ] Limites de recursos do Docker definidos.
+- [x] Versoes do InfluxDB e Grafana fixadas.
+- [x] Limites de recursos do Docker definidos.
 - [x] Contrato de campos e unidades congelado.
-- [ ] Pipeline iniciado por um unico comando.
-- [ ] Agente enviando continuamente a cada 60 segundos.
+- [x] Pipeline iniciado por um unico comando.
+- [x] Agente enviando continuamente a cada 60 segundos.
 - [x] Datasource do Grafana provisionado automaticamente.
 - [ ] Dashboard de CPU funcionando.
 - [ ] Dashboard de memoria funcionando.
@@ -148,7 +148,7 @@ Caso contrario, qualquer mudanca de nome ou unidade obrigara a refazer as consul
 - [ ] Filtros de host e ambiente funcionando.
 - [ ] Recuperacao da fila do agente validada.
 - [ ] Reinicio dos containers validado sem perda de dados.
-- [ ] README com operacao local concluido.
+- [x] README com operacao local concluido.
 - [ ] Teste final reproduzivel aprovado.
 
 ## 6. Fora do MVP
@@ -169,6 +169,6 @@ Estes itens permanecem importantes, mas nao bloqueiam a definicao atual de pront
 
 ## 7. Proxima acao
 
-A proxima entrega deve automatizar a execucao local da API e do agente. Os dashboards podem ser
-criados manualmente em seguida, usando os nomes definidos em `docs/CONTRATO_METRICAS.md`, e
-exportados como JSON para o repositorio.
+A proxima entrega e criar os dashboards manualmente no Grafana, usando os nomes definidos em
+`docs/CONTRATO_METRICAS.md`, e exportar os JSONs para o repositorio. Depois disso, a Entrega 5
+validara recuperacao da fila, persistencia apos reinicio e reproducibilidade completa.

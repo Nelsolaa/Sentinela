@@ -45,14 +45,31 @@ O lote padrao de 20 itens permanece abaixo do rate limit padrao de 30 requisicoe
 
 ## Execucao
 
-Com o ambiente virtual ativado, execute um unico ciclo para validar a configuracao:
+Para iniciar InfluxDB, Grafana, API e agente na ordem correta, use o gerenciador local a partir
+da raiz do repositorio:
+
+```bash
+venv/bin/python manage.py start
+venv/bin/python manage.py status
+```
+
+O gerenciador deixa API e agente em segundo plano, registra os logs em `.sentinela/logs/` e
+impede uma segunda instancia acidental. Para consultar os logs ou encerrar todo o pipeline:
+
+```bash
+venv/bin/python manage.py logs --service all
+venv/bin/python manage.py stop
+```
+
+Os comandos diretos abaixo ficam reservados para diagnostico. Com o ambiente virtual ativado,
+execute um unico ciclo para validar somente o agente:
 
 ```bash
 python agent.py --once
 ```
 
 O comando retorna `0` quando a metrica foi entregue e `1` quando ela ficou na fila. Para manter
-o agente coletando continuamente:
+somente o agente coletando continuamente em primeiro plano:
 
 ```bash
 python agent.py
