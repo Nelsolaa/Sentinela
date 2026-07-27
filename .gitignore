@@ -17,6 +17,7 @@ ENV/
 # Logs and local runtime files
 *.log
 logs/
+.sentinela/
 
 # Test, coverage, and type-check caches
 .pytest_cache/
