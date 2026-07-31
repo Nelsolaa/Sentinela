@@ -29,7 +29,7 @@ O servidor Linux, o bot do Telegram e recursos preditivos nao fazem parte deste 
 | InfluxDB e Grafana | concluido | stack Docker integrada na `main` |
 | datasource do Grafana | concluido | provisioning aponta para InfluxDB com Flux |
 | execucao local automatizada | concluido | um comando gerencia Docker, API e agente no host |
-| dashboards provisionados | pendente | nenhum dashboard JSON esta versionado |
+| dashboards provisionados | concluido | dashboard V2 do Grafana exportado e provisionado por arquivo |
 | validacao reproduzivel | pendente | falta testar a solucao consolidada a partir da `main` |
 
 ## 3. Caminho critico
@@ -141,11 +141,12 @@ Caso contrario, qualquer mudanca de nome ou unidade obrigara a refazer as consul
 - [x] Pipeline iniciado por um unico comando.
 - [x] Agente enviando continuamente a cada 60 segundos.
 - [x] Datasource do Grafana provisionado automaticamente.
-- [ ] Dashboard de CPU funcionando.
-- [ ] Dashboard de memoria funcionando.
-- [ ] Dashboard de disco funcionando.
-- [ ] Status da ultima coleta funcionando.
-- [ ] Filtros de host e ambiente funcionando.
+- [x] Dashboard de CPU funcionando.
+- [x] Dashboard de memoria funcionando.
+- [x] Dashboard de disco funcionando.
+- [x] Status da ultima coleta funcionando.
+- [x] Filtro de host funcionando.
+- [ ] Filtro de ambiente funcionando.
 - [ ] Recuperacao da fila do agente validada.
 - [ ] Reinicio dos containers validado sem perda de dados.
 - [x] README com operacao local concluido.
@@ -169,6 +170,6 @@ Estes itens permanecem importantes, mas nao bloqueiam a definicao atual de pront
 
 ## 7. Proxima acao
 
-A proxima entrega e criar os dashboards manualmente no Grafana, usando os nomes definidos em
-`docs/CONTRATO_METRICAS.md`, e exportar os JSONs para o repositorio. Depois disso, a Entrega 5
-validara recuperacao da fila, persistencia apos reinicio e reproducibilidade completa.
+A proxima entrega e concluir a validacao final: adicionar o filtro de ambiente, comprovar a
+recuperacao da fila, reiniciar os containers sem perda de dados e repetir a instalacao seguindo
+somente o README.
